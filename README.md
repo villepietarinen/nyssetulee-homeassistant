@@ -94,11 +94,11 @@ after a card is hidden. There are no backend polling entities or schedulers.
 
 ## Shared request cache
 
-HA reuses successful, nonempty complete-route responses for five minutes by default.
+HA reuses successful, nonempty, warning-free route responses for five minutes by default.
 Identical routes across cards/devices share this cache and any in-flight request.
 Reverse routes and different credentials remain separate. The cache is in memory,
 bounded to 128 routes, and retains the original service update timestamp. Empty,
-failed and incomplete results are not cached; expired entries are not served.
+failed and warning-bearing results are not cached; expired entries are not served.
 
 Countdowns and departure visibility update locally using already loaded data.
 The regular visible-card refresh schedule remains unchanged. Opening/reloading/returning to the card and manual **Refresh**
@@ -154,3 +154,5 @@ node tests/browser/publicha.cjs
 
 The fixture intercepts service requests and uses generated/example data. It does
 not connect to a user's HA or exercise production credentials.
+
+Normal bounded result windows can be cached even when `search_complete` is false; the planner pagination limit alone is not a routing error.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.4 - 2026-11-04
+
+- Cache normal bounded search windows when they contain departures and no routing warnings. A planner pagination limit alone does not mean that the returned departures failed validation.
+- Keep errors, empty responses and routing warnings uncached.
+
 ## 0.8.3 - 2026-11-04
 
 - Add Finnish/English Digitransit attribution to the card footer.

@@ -97,9 +97,9 @@ class NysseClient:
         data = await self.get("/api/journeys", params)
         if not isinstance(data, dict) or not isinstance(data.get("journeys"), list):
             raise NysseError("Unexpected timetable response.")
-        # Never prolong empty, failed or incomplete routing results.
+        # Never prolong empty, failed or warning-bearing results; bounded windows are normal.
         if (self.cache_seconds > 0 and data["journeys"] and not data.get("error")
-                and not data.get("routing_errors") and data.get("search_complete") is not False):
+                and not data.get("routing_errors")):
             remaining = data.get("cache_remaining_seconds", self.cache_seconds)
             lifetime = min(self.cache_seconds, max(0, remaining)) if isinstance(remaining, (int, float)) and math.isfinite(remaining) else self.cache_seconds
             self._cache[key] = (self._clock() + lifetime, deepcopy(data))

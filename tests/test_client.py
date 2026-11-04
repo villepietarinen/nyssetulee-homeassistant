@@ -108,7 +108,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_empty_and_partial_responses_are_not_cached(self):
         for payload in ({"journeys":[]}, {"journeys":[{}], "routing_errors":[{}]},
-                        {"journeys":[{}], "search_complete":False}, {"journeys":[{}], "error":"failed"}):
+                        {"journeys":[{}], "error":"failed"}):
             self.client.get = AsyncMock(return_value=payload)
             await self.client.journeys(self.origin, self.destination)
             await self.client.journeys(self.origin, self.destination)
@@ -163,3 +163,10 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         now[0] = 31
         await self.client.journeys(self.origin, self.destination)
         self.assertEqual(self.client.get.await_count, 2)
+
+
+    async def test_bounded_nonempty_error_free_window_is_cached(self):
+        self.client.get = AsyncMock(return_value={"journeys":[{}], "search_complete":False, "routing_errors":[]})
+        await self.client.journeys(self.origin, self.destination)
+        await self.client.journeys(self.origin, self.destination)
+        self.assertEqual(self.client.get.await_count, 1)
