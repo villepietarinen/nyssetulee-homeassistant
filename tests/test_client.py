@@ -2,6 +2,8 @@ import importlib.util
 from pathlib import Path
 import unittest
 import random
+import asyncio
+from unittest.mock import AsyncMock
 
 import aiohttp
 from aiohttp import web
@@ -82,3 +84,70 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.bad_response = True
         result = await self.client.both_directions(self.origin, self.destination)
         self.assertIn("Unexpected timetable response", result["outward"]["error"])
+
+
+    async def test_shared_cache_coalesces_preserves_timestamp_and_expires(self):
+        now = [0]
+        self.client._clock = lambda: now[0]
+        payload = {"journeys":[{"legs":[]}], "updated":"original service timestamp"}
+        self.client.get = AsyncMock(return_value=payload)
+        results = await asyncio.gather(*(self.client.journeys(self.origin, self.destination) for _ in range(8)))
+        self.assertEqual(self.client.get.await_count, 1)
+        results[0]["journeys"].clear()
+        cached = await self.client.journeys(self.origin, self.destination)
+        self.assertEqual(len(cached["journeys"]), 1)
+        self.assertEqual(cached["updated"], payload["updated"])
+        self.assertEqual(self.client.get.await_count, 1)
+        await self.client.journeys(self.origin, self.destination, force_refresh=True)
+        self.assertEqual(self.client.get.await_count, 2)
+        await self.client.journeys(self.destination, self.origin)
+        self.assertEqual(self.client.get.await_count, 3)
+        now[0] = 60
+        await self.client.journeys(self.origin, self.destination)
+        self.assertEqual(self.client.get.await_count, 4)
+
+    async def test_failed_empty_and_partial_responses_are_not_cached(self):
+        for payload in ({"journeys":[]}, {"journeys":[{}], "routing_errors":[{}]},
+                        {"journeys":[{}], "search_complete":False}, {"journeys":[{}], "error":"failed"}):
+            self.client.get = AsyncMock(return_value=payload)
+            await self.client.journeys(self.origin, self.destination)
+            await self.client.journeys(self.origin, self.destination)
+            self.assertEqual(self.client.get.await_count, 2)
+        self.client.get = AsyncMock(side_effect=NysseError("Request limit reached. Try again later.", 120))
+        for _ in range(2):
+            with self.assertRaises(NysseError):
+                await self.client.journeys(self.origin, self.destination)
+        self.assertEqual(self.client.get.await_count, 2)
+
+    async def test_one_cancelled_waiter_does_not_cancel_shared_request(self):
+        started, release = asyncio.Event(), asyncio.Event()
+        async def get(*args):
+            started.set()
+            await release.wait()
+            return {"journeys":[{}]}
+        self.client.get = AsyncMock(side_effect=get)
+        first = asyncio.create_task(self.client.journeys(self.origin, self.destination))
+        second = asyncio.create_task(self.client.journeys(self.origin, self.destination))
+        await started.wait()
+        first.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await first
+        release.set()
+        self.assertEqual(await second, {"journeys":[{}]})
+        self.assertEqual(self.client.get.await_count, 1)
+
+    async def test_cache_is_bounded_disabled_and_scoped_to_client_credentials(self):
+        self.client.get = AsyncMock(return_value={"journeys":[{}]})
+        for _ in range(129):
+            point = {"lat":random.uniform(59, 71), "lon":random.uniform(19, 33)}
+            await self.client.journeys(point, self.destination)
+        self.assertEqual(len(self.client._cache), 128)
+        other = NysseClient(self.session, self.client.base_url, {"X-Digitransit-Key":"other-example-test-key"})
+        other.get = AsyncMock(return_value={"journeys":[{}]})
+        await other.journeys(point, self.destination)
+        self.assertEqual(other.get.await_count, 1)
+        other.cache_seconds = 0
+        other._cache.clear()
+        await other.journeys(point, self.destination)
+        await other.journeys(point, self.destination)
+        self.assertEqual(other.get.await_count, 3)

@@ -105,6 +105,7 @@ export class VisibleRefresher {
     this.active = false;
     this.busy = false;
     this.pending = false;
+    this.pendingForce = false;
     this.notBefore = 0;
   }
   setActive(active) {
@@ -112,20 +113,23 @@ export class VisibleRefresher {
     this.active = active;
     this.timers.clearTimeout(this.timer);
     this.pending = false;
+    this.pendingForce = false;
     if (active) void this.refresh();
   }
-  async refresh() {
+  async refresh(force = false) {
     if (!this.active) return;
     this.timers.clearTimeout(this.timer);
-    if (this.busy) { this.pending = true; return; }
+    if (this.busy) { this.pending = true; this.pendingForce ||= force; return; }
     if (Date.now() < this.notBefore) { this.schedule(); return; }
     this.busy = true;
-    try { await this.fetchData(); }
+    try { await this.fetchData(force); }
     finally {
       this.busy = false;
       if (this.active && this.pending) {
+        const pendingForce = this.pendingForce;
         this.pending = false;
-        void this.refresh();
+        this.pendingForce = false;
+        void this.refresh(pendingForce);
       } else this.schedule();
     }
   }
@@ -170,7 +174,7 @@ export class NyssetuleeCard extends HTMLElement {
     this._revision++;
     this._data = null;
     this._error = null;
-    this._refresher = new VisibleRefresher(() => this._fetch(), interval * 1000);
+    this._refresher = new VisibleRefresher(force => this._fetch(force), interval * 1000);
     this._render();
     this._syncVisibility();
   }
@@ -220,13 +224,13 @@ export class NyssetuleeCard extends HTMLElement {
       this._syncVisibility();
     }, 60000);
   }
-  async _fetch() {
+  async _fetch(force = false) {
     if (!this._hasRoute || !this._hass) return;
     const revision = this._revision;
     this._loading = true;
     this._updateResults();
     try {
-      const result = await this._hass.callWS({type: "nyssetulee/journey", origin: this._origin, destination: this._destination});
+      const result = await this._hass.callWS({type: "nyssetulee/journey", origin: this._origin, destination: this._destination, ...(force ? {force_refresh:true} : {})});
       if (revision !== this._revision) return;
       this._data = result;
       this._error = null;
@@ -284,7 +288,7 @@ export class NyssetuleeCard extends HTMLElement {
         if (event.key === "Escape") this.shadowRoot.getElementById(`${key}-suggestions`).replaceChildren();
       });
     }
-    this.shadowRoot.getElementById("refresh").addEventListener("click", () => this._refresher.refresh());
+    this.shadowRoot.getElementById("refresh").addEventListener("click", () => this._refresher.refresh(true));
     this._updateResults();
   }
   _updateResults() {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1 - 2026-11-04
+
+- Share successful route results for 60 seconds across HA cards/devices and coalesce simultaneous identical requests.
+- Keep countdown updates local, preserve original timestamps, and isolate route directions and credential instances.
+- Manual refresh bypasses the HA cache; failed, empty or incomplete results are not cached. Add a bounded configurable cache without background polling.
+
 ## 0.8.0 - 2026-11-04
 
 - Initial standalone HACS package, bundling the integration and automatically loaded card.

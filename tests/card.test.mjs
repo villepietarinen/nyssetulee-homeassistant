@@ -303,3 +303,32 @@ test("visual editor emits per-card route config for dashboard persistence", () =
   assert.equal(event.composed, true);
   assert.deepEqual(event.detail.config, {type:"custom:nyssetulee-card", title:"My route", refresh_interval:300, origin:A, destination:B});
 });
+
+
+test("manual refresh retains its cache-bypass flag when queued behind a request", async () => {
+  const timers = new Timers();
+  const flags = [];
+  let release;
+  const poller = new VisibleRefresher(force => {
+    flags.push(force);
+    return flags.length === 1 ? new Promise(resolve => {release=resolve;}) : Promise.resolve();
+  }, 60000, timers);
+  poller.setActive(true);
+  await poller.refresh(true);
+  release();
+  await flush();
+  assert.deepEqual(flags, [false, true]);
+  poller.setActive(false);
+});
+
+test("manual card fetch asks HA to bypass its cache", async () => {
+  const card = Object.create(NyssetuleeCard.prototype);
+  card._origin=A; card._destination=B; card._revision=1; card._refresher={};
+  card._updateResults=() => {};
+  let message;
+  card._hass={callWS:async value => {message=value; return {journeys:[]};}};
+  await card._fetch(true);
+  assert.equal(message.force_refresh, true);
+  await card._fetch();
+  assert.equal(message.force_refresh, undefined);
+});

@@ -1,6 +1,9 @@
-"""On-demand HTTP client. No background tasks or polling."""
+"""On-demand HTTP client. No scheduled polling."""
 import asyncio
 import math
+from collections import OrderedDict
+from copy import deepcopy
+from time import monotonic
 
 import aiohttp
 
@@ -25,7 +28,11 @@ def coordinates(point):
 
 
 class NysseClient:
-    def __init__(self, session, base_url, headers=None):
+    def __init__(self, session, base_url, headers=None, cache_seconds=60, clock=monotonic):
+        self.cache_seconds = cache_seconds
+        self._clock = clock
+        self._cache = OrderedDict()
+        self._inflight = {}
         self.session = session
         self.base_url = base_url.rstrip("/")
         self.headers = {"Accept": "application/json", "User-Agent": "HomeAssistant-Nyssetulee/0.1", **(headers or {})}
@@ -55,12 +62,45 @@ class NysseClient:
             raise NysseError("Unexpected address lookup response.")
         return data
 
-    async def journeys(self, origin, destination):
-        a_lat, a_lon = coordinates(origin)
-        b_lat, b_lon = coordinates(destination)
-        data = await self.get("/api/journeys", {"a_lat": a_lat, "a_lon": a_lon, "b_lat": b_lat, "b_lon": b_lon})
+    async def journeys(self, origin, destination, force_refresh=False):
+        key = (*coordinates(origin), *coordinates(destination))
+        now = self._clock()
+        for cached_key, (expires, _) in list(self._cache.items()):
+            if expires <= now:
+                self._cache.pop(cached_key, None)
+        if force_refresh:
+            self._cache.pop(key, None)
+        elif key in self._cache:
+            self._cache.move_to_end(key)
+            return deepcopy(self._cache[key][1])
+
+        # Share an in-flight request, including a manual refresh already underway.
+        if key not in self._inflight:
+            task = asyncio.create_task(self._load_journeys(key))
+            self._inflight[key] = task
+
+            def completed(done):
+                if self._inflight.get(key) is done:
+                    self._inflight.pop(key, None)
+                if not done.cancelled():
+                    done.exception()  # Retrieve failures even if every waiter left.
+
+            task.add_done_callback(completed)
+        # Closing one dashboard must not cancel other clients' shared request.
+        return deepcopy(await asyncio.shield(self._inflight[key]))
+
+    async def _load_journeys(self, key):
+        a_lat, a_lon, b_lat, b_lon = key
+        data = await self.get("/api/journeys", {"a_lat":a_lat, "a_lon":a_lon, "b_lat":b_lat, "b_lon":b_lon})
         if not isinstance(data, dict) or not isinstance(data.get("journeys"), list):
             raise NysseError("Unexpected timetable response.")
+        # Never prolong empty, failed or incomplete routing results.
+        if (self.cache_seconds > 0 and data["journeys"] and not data.get("error")
+                and not data.get("routing_errors") and data.get("search_complete") is not False):
+            self._cache[key] = (self._clock() + self.cache_seconds, deepcopy(data))
+            self._cache.move_to_end(key)
+            while len(self._cache) > 128:
+                self._cache.popitem(last=False)
         return data
 
     async def both_directions(self, origin, destination):

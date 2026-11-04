@@ -67,8 +67,15 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
                     if single_connection.send_result.called:
                         break
                 single_connection.send_result.assert_called_once_with(2, {"journeys":[], "updated":"example"})
-                client.journeys.assert_awaited_once_with(single_msg["origin"], single_msg["destination"])
+                client.journeys.assert_awaited_once_with(single_msg["origin"], single_msg["destination"], force_refresh=False)
                 self.assertEqual(calls, [])  # No reverse-direction call.
+                forced_connection = Mock()
+                single_handler(hass, forced_connection, {**single_msg, "id":4, "force_refresh":True})
+                for _ in range(20):
+                    await asyncio.sleep(0)
+                    if forced_connection.send_result.called:
+                        break
+                client.journeys.assert_awaited_with(single_msg["origin"], single_msg["destination"], force_refresh=True)
                 from custom_components.nyssetulee.client import NysseError
                 client.journeys = AsyncMock(side_effect=NysseError("Request limit reached. Try again later.", 120))
                 limited_connection = Mock()

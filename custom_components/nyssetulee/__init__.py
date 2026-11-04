@@ -18,6 +18,7 @@ DOMAIN = "nyssetulee"
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Optional("url", default="https://nysse.polii.fi"): cv.url,
+        vol.Optional("cache_seconds", default=60): vol.All(vol.Coerce(int), vol.Range(min=0, max=300)),
         vol.Optional("api_key"): cv.string,
         vol.Optional("owner_token"): cv.string,
     })
@@ -32,7 +33,7 @@ async def async_setup(hass, config):
         headers["X-Digitransit-Key"] = settings["api_key"]
     if settings.get("owner_token"):
         headers["X-Nyssetulee-Owner-Token"] = settings["owner_token"]
-    hass.data[DOMAIN] = NysseClient(async_get_clientsession(hass), settings["url"], headers)
+    hass.data[DOMAIN] = NysseClient(async_get_clientsession(hass), settings["url"], headers, cache_seconds=settings["cache_seconds"])
     integration = await async_get_integration(hass, DOMAIN)
     card_path = Path(__file__).parent / "frontend/nyssetulee-card.js"
     card_url = "/nyssetulee/nyssetulee-card.js"
@@ -49,6 +50,7 @@ async def async_setup(hass, config):
 
 @websocket_api.websocket_command({
     vol.Required("type"): "nyssetulee/journey",
+    vol.Optional("force_refresh", default=False): cv.boolean,
     vol.Required("origin"): dict,
     vol.Required("destination"): dict,
 })
@@ -56,7 +58,7 @@ async def async_setup(hass, config):
 async def ws_journey(hass, connection, msg):
     """Fetch exactly the selected direction, preserving rate-limit retry hints."""
     try:
-        result = await hass.data[DOMAIN].journeys(msg["origin"], msg["destination"])
+        result = await hass.data[DOMAIN].journeys(msg["origin"], msg["destination"], force_refresh=msg["force_refresh"])
     except NysseError as exc:
         result = {"error": str(exc), "retry_after": exc.retry_after}
     connection.send_result(msg["id"], result)

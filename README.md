@@ -18,6 +18,8 @@ examples and release history contain no personal route configuration.
    ```yaml
    nyssetulee:
      url: https://nysse.polii.fi
+     # Optional shared route-cache lifetime (seconds, 0 disables; maximum 300).
+     # cache_seconds: 60
      # Optional: choose one credential to avoid the shared public quota.
      # api_key: !secret nyssetulee_digitransit_key
      # owner_token: !secret nyssetulee_owner_token
@@ -89,6 +91,21 @@ Countdown text updates locally once per minute. One refresh makes one journey
 request per card. Each open card/client contributes to service usage; rate-limit
 responses postpone automatic and manual retries. A request in flight may finish
 after a card is hidden. There are no backend polling entities or schedulers.
+
+## Shared request cache
+
+HA reuses successful, nonempty complete-route responses for 60 seconds by default.
+Identical routes across cards/devices share this cache and any in-flight request.
+Reverse routes and different credentials remain separate. The cache is in memory,
+bounded to 128 routes, and retains the original service update timestamp. Empty,
+failed and incomplete results are not cached; expired entries are not served.
+
+Countdowns and departure visibility update locally using already loaded data.
+The regular visible-card refresh schedule remains unchanged. Manual **Refresh**
+bypasses the HA response cache (but still respects rate-limit delays and shares
+a request already underway). The upstream service may also cache provider data.
+Optional backend YAML `cache_seconds` accepts 0–300 seconds; restart HA after changing it.
+No background fetches are introduced.
 
 ## Data and privacy
 
