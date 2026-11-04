@@ -51,7 +51,7 @@ An optional `title` overrides the translated heading. Advanced YAML supports
 `origin` and `destination` objects with `name`, `lat` and `lon`; use your own
 values from the address search. No location values are supplied here.
 
-The address fields on the displayed card can temporarily change its route.
+The displayed card shows compact clickable address text. Click a place to open an inline search field; selecting a suggestion returns it to text. Escape cancels editing. These changes temporarily affect only that card.
 For a permanent change, edit and save the card in the dashboard editor.
 
 ## Migrate an earlier manual installation
@@ -103,13 +103,13 @@ failed and incomplete results are not cached; expired entries are not served.
 Countdowns and departure visibility update locally using already loaded data.
 The regular visible-card refresh schedule remains unchanged. Opening/reloading/returning to the card and manual **Refresh**
 bypass the HA response cache (but still respects rate-limit delays and shares
-a request already underway). The upstream service may also cache provider data.
+a request already underway). Forced refreshes are forwarded to the timetable service to bypass its route cache too. The HA cache respects any remaining upstream cache lifetime. The service may separately cache stable stop/address lookups.
 Optional backend YAML `cache_seconds` accepts 0–600 seconds (up to ten minutes); restart HA after changing it.
 No background fetches are introduced.
 
 ## Data and privacy
 
-The service is `https://nysse.polii.fi`, using Digitransit/Nysse route data. Address
+The service is `https://nysse.polii.fi`, using Digitransit/Nysse route data. The card footer credits Digitransit in Finnish/English. Address
 searches and selected route coordinates are sent through your authenticated HA
 backend to that service. Configure credentials in HA secrets; they are never
 included in the served JavaScript or card URL. Without a credential the service's
@@ -143,3 +143,14 @@ For a release, update the integration manifest and changelog, tag the tested com
 `v<VERSION>`, and publish a GitHub release. CI checks the version, runs tests, and
 attaches a complete manual-install archive. HACS installs from the repository's
 root `custom_components/nyssetulee` directory.
+
+Browser regression checks (development only):
+
+```sh
+npm install --prefix tests/browser --ignore-scripts
+npm exec --prefix tests/browser -- playwright install chromium
+node tests/browser/publicha.cjs
+```
+
+The fixture intercepts service requests and uses generated/example data. It does
+not connect to a user's HA or exercise production credentials.

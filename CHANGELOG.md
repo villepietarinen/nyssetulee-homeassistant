@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.3 - 2026-11-04
+
+- Add Finnish/English Digitransit attribution to the card footer.
+- Show compact clickable place names on the card; open inline search only when editing a temporary route. Keep the visual configuration editor unchanged.
+- Forward forced refreshes to the timetable service's route cache, keeping reload/manual refresh fresh across both cache layers.
+- Respect the service response's remaining cache lifetime instead of extending older upstream results for another full cache period.
+
 ## 0.8.2 - 2026-11-04
 
 - Use a five-minute shared route cache by default, configurable up to ten minutes.

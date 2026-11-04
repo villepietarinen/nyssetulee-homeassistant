@@ -51,11 +51,11 @@ test("known service errors and HTTP errors are translated without hiding diagnos
 test("rendered card switches language with HA without fetching and preserves custom titles", () => {
   const elements = new Map();
   const element = id => {
-    if (!elements.has(id)) elements.set(id, {addEventListener() {}});
+    if (!elements.has(id)) elements.set(id, {addEventListener() {}, setAttribute() {}});
     return elements.get(id);
   };
   const card = Object.create(NyssetuleeCard.prototype);
-  card.shadowRoot = {getElementById:element};
+  card.shadowRoot = {getElementById:element, querySelector:() => ({addEventListener(){}})};
   card._config = {};
   card._origin = A;
   card._destination = B;
@@ -74,6 +74,7 @@ test("rendered card switches language with HA without fetching and preserves cus
   assert.match(card.shadowRoot.innerHTML, /Päivitä aikataulut/);
   assert.match(card.shadowRoot.innerHTML, /Lähtöosoite/);
   assert.match(card.shadowRoot.innerHTML, /Bussien lähtöajat nousupysäkillä/);
+  assert.match(card.shadowRoot.innerHTML, /Matkatiedot: Digitransit\./);
   assert.equal(element("refresh").textContent, "↻ Päivitä");
   assert.match(element("results").innerHTML, /1 h 5 min kuluttua/);
   assert.match(element("results").innerHTML, /Reaaliaikainen ennuste/);
@@ -88,6 +89,7 @@ test("rendered card switches language with HA without fetching and preserves cus
   card.hass = {locale:{language:"sv"}};
   assert.match(card.shadowRoot.innerHTML, /Omat bussit/);
   assert.match(card.shadowRoot.innerHTML, /Origin address/);
+  assert.match(card.shadowRoot.innerHTML, /Journey data: Digitransit\./);
   assert.equal(element("refresh").textContent, "Refreshing…");
   assert.match(element("results").innerHTML, /in 1 h 5 min/);
   card._data = {updated:data.updated, journeys:[]};
@@ -241,12 +243,12 @@ test("departure list sorts predictions, deduplicates, excludes expired and walki
 test("blank and incomplete routes have no defaults, requests or polling timers", async () => {
   const elements = new Map();
   const element = id => {
-    if (!elements.has(id)) elements.set(id, {addEventListener() {}, replaceChildren() {}});
+    if (!elements.has(id)) elements.set(id, {addEventListener() {}, replaceChildren() {}, setAttribute() {}});
     return elements.get(id);
   };
   globalThis.document = {visibilityState:"visible"};
   const card = Object.create(NyssetuleeCard.prototype);
-  card.shadowRoot = {getElementById:element};
+  card.shadowRoot = {getElementById:element, querySelector:() => ({addEventListener(){}})};
   card.isConnected = true;
   card._visible = true;
   card._pageActive = true;

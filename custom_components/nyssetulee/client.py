@@ -76,7 +76,7 @@ class NysseClient:
 
         # Share an in-flight request, including a manual refresh already underway.
         if key not in self._inflight:
-            task = asyncio.create_task(self._load_journeys(key))
+            task = asyncio.create_task(self._load_journeys(key, force_refresh))
             self._inflight[key] = task
 
             def completed(done):
@@ -89,15 +89,20 @@ class NysseClient:
         # Closing one dashboard must not cancel other clients' shared request.
         return deepcopy(await asyncio.shield(self._inflight[key]))
 
-    async def _load_journeys(self, key):
+    async def _load_journeys(self, key, force_refresh=False):
         a_lat, a_lon, b_lat, b_lon = key
-        data = await self.get("/api/journeys", {"a_lat":a_lat, "a_lon":a_lon, "b_lat":b_lat, "b_lon":b_lon})
+        params = {"a_lat":a_lat, "a_lon":a_lon, "b_lat":b_lat, "b_lon":b_lon}
+        if force_refresh:
+            params["force_refresh"] = "true"
+        data = await self.get("/api/journeys", params)
         if not isinstance(data, dict) or not isinstance(data.get("journeys"), list):
             raise NysseError("Unexpected timetable response.")
         # Never prolong empty, failed or incomplete routing results.
         if (self.cache_seconds > 0 and data["journeys"] and not data.get("error")
                 and not data.get("routing_errors") and data.get("search_complete") is not False):
-            self._cache[key] = (self._clock() + self.cache_seconds, deepcopy(data))
+            remaining = data.get("cache_remaining_seconds", self.cache_seconds)
+            lifetime = min(self.cache_seconds, max(0, remaining)) if isinstance(remaining, (int, float)) and math.isfinite(remaining) else self.cache_seconds
+            self._cache[key] = (self._clock() + lifetime, deepcopy(data))
             self._cache.move_to_end(key)
             while len(self._cache) > 128:
                 self._cache.popitem(last=False)

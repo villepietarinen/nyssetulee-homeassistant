@@ -151,3 +151,15 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         await other.journeys(point, self.destination)
         await other.journeys(point, self.destination)
         self.assertEqual(other.get.await_count, 3)
+
+
+    async def test_force_refresh_is_forwarded_and_upstream_cache_age_not_extended(self):
+        await self.client.journeys(self.origin, self.destination, force_refresh=True)
+        self.assertEqual(self.calls[0][1]["force_refresh"], "true")
+        now = [0]
+        self.client._clock = lambda:now[0]
+        self.client.get = AsyncMock(return_value={"journeys":[{}], "cache_remaining_seconds":30})
+        await self.client.journeys(self.origin, self.destination)
+        now[0] = 31
+        await self.client.journeys(self.origin, self.destination)
+        self.assertEqual(self.client.get.await_count, 2)

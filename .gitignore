@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 dist/
+
+tests/browser/node_modules/
+outputs/

@@ -18,10 +18,11 @@ const TEXT = {
     updated: "Updated", stale: "Older data", noUpdate: "Update time unavailable",
     warnings: "Some journeys may be missing: the service reported routing warnings.",
     searching: "Searching…", noAddresses: "No addresses found.",
-    footer: "Bus departure times at the boarding stop. Refreshes only while this card is visible.",
+    footer: "Bus departure times at the boarding stop. Refreshes only while this card is visible. Journey data: Digitransit.",
     error: "Could not load timetables. Check that the Nyssetulee integration is installed.",
     coordinates: "Origin and destination need valid Finland lat/lon coordinates.",
     interval: "refresh_interval must be at least 60 seconds.", due: "Due",
+    editOrigin: "Change origin", editDestination: "Change destination", selectOrigin: "Choose origin", selectDestination: "Choose destination",
     chooseRoute: "Select an origin and destination to see departures.",
     titleLabel: "Title (optional)", editorHelp: "Choose an address suggestion for each end of the route, then save the card.",
   },
@@ -34,10 +35,11 @@ const TEXT = {
     updated: "Päivitetty", stale: "Vanhempia tietoja", noUpdate: "Päivitysaika ei ole saatavilla",
     warnings: "Osa matkoista saattaa puuttua: palvelu ilmoitti reititysvaroituksista.",
     searching: "Haetaan…", noAddresses: "Osoitteita ei löytynyt.",
-    footer: "Bussien lähtöajat nousupysäkillä. Aikataulut päivittyvät vain tämän kortin ollessa näkyvissä.",
+    footer: "Bussien lähtöajat nousupysäkillä. Aikataulut päivittyvät vain tämän kortin ollessa näkyvissä. Matkatiedot: Digitransit.",
     error: "Aikatauluja ei voitu ladata. Tarkista, että Nyssetulee-integraatio on asennettu.",
     coordinates: "Lähtöpaikalla ja määränpäällä on oltava kelvolliset koordinaatit Suomessa.",
     interval: "refresh_interval-arvon on oltava vähintään 60 sekuntia.", due: "Nyt",
+    editOrigin: "Vaihda lähtöpaikka", editDestination: "Vaihda määränpää", selectOrigin: "Valitse lähtöpaikka", selectDestination: "Valitse määränpää",
     chooseRoute: "Valitse lähtöpaikka ja määränpää nähdäksesi lähdöt.",
     titleLabel: "Otsikko (valinnainen)", editorHelp: "Valitse osoitehaun ehdotus reitin molempiin päihin ja tallenna kortti.",
   },
@@ -255,7 +257,10 @@ export class NyssetuleeCard extends HTMLElement {
         button { cursor:pointer; color:var(--primary-text-color); background:var(--secondary-background-color, #eee); border:0; border-radius:10px; padding:10px 12px; }
         button:focus-visible,input:focus-visible { outline:2px solid var(--primary-color); outline-offset:2px; }
         button:disabled { opacity:.55; cursor:wait; }
-        .places { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:20px 0 12px; }
+        .places { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 10px; }
+        [hidden] { display:none!important; }
+        .place-name { display:block; width:100%; padding:0; margin-top:5px; background:transparent; border-radius:3px; text-align:left; font-size:13px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .place-name:hover { text-decoration:underline; }
         label { display:block; color:var(--secondary-text-color); font-size:12px; }
         input { box-sizing:border-box; width:100%; min-width:0; margin-top:6px; padding:11px; border:1px solid var(--divider-color,#ccc); border-radius:10px; background:var(--card-background-color); color:var(--primary-text-color); }
         .suggestions button { display:block; text-align:left; width:100%; margin-top:5px; }
@@ -275,7 +280,12 @@ export class NyssetuleeCard extends HTMLElement {
       <ha-card>
         <header><div><div class="brand">Nyssetulee</div><h2>${escapeHTML(this._config.title || t.title)}</h2></div><button id="refresh" aria-label="${t.refreshLabel}">↻ ${t.refresh}</button></header>
         <div class="places">
-          ${["origin", "destination"].map(key => `<div><label>${key === "origin" ? t.from : t.to}<input id="${key}" autocomplete="off" maxlength="120" aria-label="${t[key]}" aria-controls="${key}-suggestions"></label><div id="${key}-suggestions" class="suggestions" aria-live="polite"></div></div>`).join("")}
+          ${["origin", "destination"].map(key => {
+            const name = this[`_${key}`]?.name || "";
+            const editLabel = key === "origin" ? t.editOrigin : t.editDestination;
+            const emptyLabel = key === "origin" ? t.selectOrigin : t.selectDestination;
+            return `<div><label for="${key}">${key === "origin" ? t.from : t.to}</label><button id="${key}-display" class="place-name" aria-label="${editLabel}: ${escapeHTML(name || emptyLabel)}" title="${escapeHTML(name || emptyLabel)}">${escapeHTML(name || emptyLabel)}</button><input id="${key}" hidden autocomplete="off" maxlength="120" aria-label="${t[key]}" aria-controls="${key}-suggestions"><div id="${key}-suggestions" class="suggestions" aria-live="polite"></div></div>`;
+          }).join("")}
         </div>
         <div id="results" aria-live="polite"></div>
         <footer>${t.footer}</footer>
@@ -283,9 +293,11 @@ export class NyssetuleeCard extends HTMLElement {
     for (const key of ["origin", "destination"]) {
       const input = this.shadowRoot.getElementById(key);
       input.value = this[`_${key}`]?.name || "";
+      this.shadowRoot.getElementById(`${key}-display`).addEventListener("click", () => this._editPlace(key));
+      this.shadowRoot.querySelector(`label[for="${key}"]`).addEventListener("click", event => {event.preventDefault(); this._editPlace(key);});
       input.addEventListener("input", () => this._search(key, input.value));
       input.addEventListener("keydown", event => {
-        if (event.key === "Escape") this.shadowRoot.getElementById(`${key}-suggestions`).replaceChildren();
+        if (event.key === "Escape") this._closePlace(key, true);
       });
     }
     this.shadowRoot.getElementById("refresh").addEventListener("click", () => this._refresher.refresh(true));
@@ -347,6 +359,31 @@ export class NyssetuleeCard extends HTMLElement {
       }
     }, 500);
   }
+  _editPlace(key) {
+    const input = this.shadowRoot.getElementById(key);
+    this.shadowRoot.getElementById(`${key}-display`).hidden = true;
+    input.hidden = false;
+    input.focus();
+    input.select();
+  }
+  _closePlace(key, focus = false) {
+    clearTimeout(this._searchTimers[key]);
+    this._searchRevisions[key]++;
+    const name = this[`_${key}`]?.name || "";
+    const button = this.shadowRoot.getElementById(`${key}-display`);
+    const t = this._text;
+    const label = key === "origin" ? t.editOrigin : t.editDestination;
+    const empty = key === "origin" ? t.selectOrigin : t.selectDestination;
+    button.textContent = name || empty;
+    button.title = name || empty;
+    button.setAttribute("aria-label", `${label}: ${name || empty}`);
+    button.hidden = false;
+    const input = this.shadowRoot.getElementById(key);
+    input.value = name;
+    input.hidden = true;
+    this.shadowRoot.getElementById(`${key}-suggestions`).replaceChildren();
+    if (focus) button.focus();
+  }
   _selectPlace(key, place) {
     if (!validPoint(place)) return;
     const wasActive = this._refresher.active;
@@ -355,8 +392,7 @@ export class NyssetuleeCard extends HTMLElement {
     this._searchRevisions[key]++;
     this._data = null;
     this._error = null;
-    this.shadowRoot.getElementById(key).value = place.name || "";
-    this.shadowRoot.getElementById(`${key}-suggestions`).replaceChildren();
+    this._closePlace(key);
     this._updateResults();
     this._syncVisibility();
     if (wasActive) void this._refresher.refresh();
