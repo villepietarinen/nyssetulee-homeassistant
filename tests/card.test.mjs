@@ -272,7 +272,7 @@ test("blank and incomplete routes have no defaults, requests or polling timers",
   card._selectPlace("destination", B);
   await flush();
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0], {type:"nyssetulee/journey", origin:A, destination:B});
+  assert.deepEqual(calls[0], {type:"nyssetulee/journey", origin:A, destination:B, force_refresh:true});
   card._visible = false;
   card._syncVisibility();
   assert.equal(card._refresher.active, false);
@@ -313,7 +313,8 @@ test("manual refresh retains its cache-bypass flag when queued behind a request"
     flags.push(force);
     return flags.length === 1 ? new Promise(resolve => {release=resolve;}) : Promise.resolve();
   }, 60000, timers);
-  poller.setActive(true);
+  poller.active = true;
+  void poller.refresh();
   await poller.refresh(true);
   release();
   await flush();
@@ -331,4 +332,20 @@ test("manual card fetch asks HA to bypass its cache", async () => {
   assert.equal(message.force_refresh, true);
   await card._fetch();
   assert.equal(message.force_refresh, undefined);
+});
+
+
+test("opening/reloading/returning bypass cache while automatic refresh reuses it", async () => {
+  const timers = new Timers();
+  const flags = [];
+  const poller = new VisibleRefresher(async force => {flags.push(force);}, 60000, timers);
+  poller.setActive(true);
+  await flush();
+  timers.fire();
+  await flush();
+  poller.setActive(false);
+  poller.setActive(true);
+  await flush();
+  assert.deepEqual(flags, [true, false, true]);
+  poller.setActive(false);
 });

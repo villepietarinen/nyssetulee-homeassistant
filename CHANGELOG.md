@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 - 2026-11-04
+
+- Use a five-minute shared route cache by default, configurable up to ten minutes.
+- Opening, reloading, returning and manual refresh bypass the HA cache. Automatic refresh can reuse it while the UI updates countdowns locally.
+
 ## 0.8.1 - 2026-11-04
 
 - Share successful route results for 60 seconds across HA cards/devices and coalesce simultaneous identical requests.

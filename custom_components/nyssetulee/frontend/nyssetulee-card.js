@@ -114,7 +114,7 @@ export class VisibleRefresher {
     this.timers.clearTimeout(this.timer);
     this.pending = false;
     this.pendingForce = false;
-    if (active) void this.refresh();
+    if (active) void this.refresh(true);
   }
   async refresh(force = false) {
     if (!this.active) return;

@@ -18,7 +18,7 @@ DOMAIN = "nyssetulee"
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Optional("url", default="https://nysse.polii.fi"): cv.url,
-        vol.Optional("cache_seconds", default=60): vol.All(vol.Coerce(int), vol.Range(min=0, max=300)),
+        vol.Optional("cache_seconds", default=300): vol.All(vol.Coerce(int), vol.Range(min=0, max=600)),
         vol.Optional("api_key"): cv.string,
         vol.Optional("owner_token"): cv.string,
     })

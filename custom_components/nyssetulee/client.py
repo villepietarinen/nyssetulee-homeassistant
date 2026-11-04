@@ -28,7 +28,7 @@ def coordinates(point):
 
 
 class NysseClient:
-    def __init__(self, session, base_url, headers=None, cache_seconds=60, clock=monotonic):
+    def __init__(self, session, base_url, headers=None, cache_seconds=300, clock=monotonic):
         self.cache_seconds = cache_seconds
         self._clock = clock
         self._cache = OrderedDict()

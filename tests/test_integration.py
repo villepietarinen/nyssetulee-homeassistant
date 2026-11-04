@@ -36,6 +36,7 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
                 result = await async_setup_component(hass, "nyssetulee", {"nyssetulee": {"url":"https://nysse.polii.fi"}})
                 self.assertTrue(result)
                 client = hass.data["nyssetulee"]
+                self.assertEqual(client.cache_seconds, 300)
                 calls = []
 
                 async def both_directions(origin, destination):

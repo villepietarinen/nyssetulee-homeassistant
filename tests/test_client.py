@@ -102,7 +102,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.get.await_count, 2)
         await self.client.journeys(self.destination, self.origin)
         self.assertEqual(self.client.get.await_count, 3)
-        now[0] = 60
+        now[0] = self.client.cache_seconds
         await self.client.journeys(self.origin, self.destination)
         self.assertEqual(self.client.get.await_count, 4)
 
