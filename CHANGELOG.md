@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.5 - 2026-11-04
+
+- Constrain compact place labels to equal-width columns, truncating long names without pushing the other field outside the card.
+- Add a browser layout regression using a long synthetic place label.
+
 ## 0.8.4 - 2026-11-04
 
 - Cache normal bounded search windows when they contain departures and no routing warnings. A planner pagination limit alone does not mean that the returned departures failed validation.

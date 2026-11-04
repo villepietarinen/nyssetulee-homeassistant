@@ -73,6 +73,19 @@ const root = path.resolve(__dirname,'../..');
     assert.equal(await first.getByRole('textbox').count(), 0);
     assert.equal(await first.locator('h3').innerText(), 'Place D → Place B');
     assert.match(await first.locator('footer').innerText(), /Matkatiedot: Digitransit\./);
+    const longLabel = 'Synthetic long place label ' + 'x'.repeat(70);
+    await first.getByRole('button', {name:'Vaihda määränpää: Place B', exact:true}).click();
+    await first.getByRole('textbox', {name:'Määränpään osoite', exact:true}).fill(longLabel);
+    await first.getByRole('button', {name:longLabel, exact:true}).click();
+    const widths = await first.evaluate(card => {
+      const places = card.shadowRoot.querySelector('.places').getBoundingClientRect();
+      return [...card.shadowRoot.querySelectorAll('.place-name')].map(button => {
+        const box=button.getBoundingClientRect();
+        return {width:box.width, within:box.left>=places.left-1 && box.right<=places.right+1, total:places.width};
+      });
+    });
+    assert.ok(widths.every(item => item.within && item.width < item.total * .6));
+    assert.ok(Math.abs(widths[0].width-widths[1].width)<1);
     await page.screenshot({path:path.resolve('outputs/nyssetulee-public-editor.png'), fullPage:true});
     // Saving/recreating a card uses only the user's selected configuration.
     await page.evaluate(() => {

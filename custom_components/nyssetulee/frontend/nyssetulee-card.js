@@ -257,8 +257,9 @@ export class NyssetuleeCard extends HTMLElement {
         button { cursor:pointer; color:var(--primary-text-color); background:var(--secondary-background-color, #eee); border:0; border-radius:10px; padding:10px 12px; }
         button:focus-visible,input:focus-visible { outline:2px solid var(--primary-color); outline-offset:2px; }
         button:disabled { opacity:.55; cursor:wait; }
-        .places { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 10px; }
+        .places { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin:14px 0 10px; }
         [hidden] { display:none!important; }
+        .places > div { min-width:0; }
         .place-name { display:block; width:100%; padding:0; margin-top:5px; background:transparent; border-radius:3px; text-align:left; font-size:13px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .place-name:hover { text-decoration:underline; }
         label { display:block; color:var(--secondary-text-color); font-size:12px; }
