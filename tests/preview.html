@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nyssetulee: empty-route editor fixture</title>
+<style>
+  :root {font:15px system-ui,sans-serif; --primary-color:#007b55; --primary-text-color:#172b26; --secondary-text-color:#65746e; --card-background-color:#fff; --secondary-background-color:#eef3f0; --divider-color:#e4eae6; --text-primary-color:#fff;}
+  body {margin:0; background:#f0f4f1; padding:24px;}
+  main {max-width:1100px; margin:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px;}
+  .note {grid-column:1/-1; color:#65746e; font-size:13px;}
+  nyssetulee-card-editor {display:block; background:white; padding:16px; border-radius:12px; margin-bottom:16px;}
+  ha-card {display:block; background:white; border:1px solid #dfe7e1; border-radius:16px;}
+  @media(max-width:650px) {main {grid-template-columns:1fr;}}
+</style>
+<main>
+  <p class="note">Editor test fixture. Starts empty. Searches return synthetic, generated test points; no real addresses or network calls.</p>
+  <section id="first"><nyssetulee-card-editor></nyssetulee-card-editor><nyssetulee-card></nyssetulee-card></section>
+  <section id="second"><nyssetulee-card-editor></nyssetulee-card-editor><nyssetulee-card></nyssetulee-card></section>
+</main>
+<script type="module">
+import "../custom_components/nyssetulee/frontend/nyssetulee-card.js";
+customElements.define("ha-card", class extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({mode:"open"}).innerHTML = '<style>:host{display:block;background:var(--card-background-color,#fff);border:1px solid #dfe7e1;border-radius:16px;}</style><slot></slot>';
+  }
+});
+window.requests = [];
+window.saved = {};
+const points = new Map();
+const hass = {locale:{language:"en"}, callWS:async message => {
+  window.requests.push(message);
+  if (message.type === "nyssetulee/places") {
+    if (!points.has(message.query)) points.set(message.query, {
+      name:message.query, lat:59 + Math.random() * 12, lon:19 + Math.random() * 14,
+    });
+    return [points.get(message.query)];
+  }
+  return {updated:new Date().toISOString(), journeys:[{legs:[{
+    mode:"BUS", line:"X", departure_realtime:true,
+    departure:new Date(Date.now() + 65 * 60000).toISOString(),
+    from:{name:message.origin.name}, to:{name:message.destination.name},
+  }]}]};
+}};
+for (const section of document.querySelectorAll("section")) {
+  const editor = section.querySelector("nyssetulee-card-editor");
+  const card = section.querySelector("nyssetulee-card");
+  const config = {type:"custom:nyssetulee-card"};
+  editor.setConfig(config);
+  editor.hass = hass;
+  card.setConfig(config);
+  card.hass = hass;
+  editor.addEventListener("config-changed", event => {
+    window.saved[section.id] = event.detail.config;
+    card.setConfig(event.detail.config);
+  });
+}
+</script>
+</html>
